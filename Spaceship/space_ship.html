@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Spaceship Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden; /* Hide page scrollbars */
+            background-image: url('background.jpg'); /* Change this to your background image file */
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const spaceship = new Image();
+        spaceship.src = 'spaceship.png'; // Change this to your spaceship image file
+
+        const bulletSpeed = 10;
+        const bullets = [];
+
+        // Replace 'your_asteroid1_image.png' with your custom asteroid1 image file path
+        const asteroid1ImageSrc = 'asteroid1.png'; // Change this to your asteroid1 image file path
+        const asteroid1SpeedX = 1;
+        const asteroid1SpeedY = 0.7;
+        const asteroid1s = [];
+
+        // Replace 'your_asteroid2_image.png' with your custom asteroid2 image file path
+        const asteroid2ImageSrc = 'asteroid2.png'; // Change this to your asteroid2 image file path
+        const asteroid2SpeedX = 1;
+        const asteroid2SpeedY = 0.8;
+        const asteroid2s = [];
+
+        const enemySpeedX = 2.5;
+        const enemySpeedY = 2.5;
+        const enemies = [];
+        const enemyBulletSpeed = 5;
+        const enemyBullets = [];
+        const enemyCreationThreshold = 0.003; // Adjust this value to control the frequency of enemy spaceship appearances
+        const CreationAsteroid1 = 0.01; // Adjust this value to control the frequency of asteroid1 appearances
+        const CreationAsteroid2 = 0.005; // Adjust this value to control the frequency of asteroid2 appearances
+
+        // Replace 'enemy_spaceship.png' with your custom enemy spaceship image file path
+        const enemyImageSrc = 'enemy_spaceship.png'; // Change this to your enemy spaceship image file path
+
+        // Explosion image for spaceship and enemies
+        const explosionImage = new Image();
+        explosionImage.src = 'explosion.png'; // Change this to your explosion image file path
+
+        canvas.width = window.innerWidth; // Set canvas width to match window width
+        canvas.height = window.innerHeight; // Set canvas height to match window height
+
+        let spaceshipX = canvas.width / 2;
+        let spaceshipY = canvas.height - 100; // Adjust the Y position as needed
+        const spaceshipWidth = 100; // Adjust the width as needed
+        const spaceshipHeight = 100; // Adjust the height as needed
+        const spaceshipSpeed = 5;
+
+        let leftPressed = false;
+        let rightPressed = false;
+        let upPressed = false;
+        let downPressed = false;
+        let spacePressed = false;
+
+        let spaceshipExploded = false; // Flag to track spaceship explosion
+        let spaceshipExplosionFrame = 0;
+
+        let explosionFrame = 0; // Counter for explosion frames
+        const maxExplosionFrames = 30; // Adjust the number of frames for the explosion duration
+
+        const explosionTimeout = 1000; // 1 second in milliseconds for explosion display
+
+        // Score and game over variables
+        let score = 0;
+        let gameOver = false;
+
+        document.addEventListener('keydown', keyDownHandler);
+        document.addEventListener('keyup', keyUpHandler);
+
+        function keyDownHandler(event) {
+            if (event.key === 'Right' || event.key === 'ArrowRight') {
+                rightPressed = true;
+            } else if (event.key === 'Left' || event.key === 'ArrowLeft') {
+                leftPressed = true;
+            } else if (event.key === 'Up' || event.key === 'ArrowUp') {
+                upPressed = true;
+            } else if (event.key === 'Down' || event.key === 'ArrowDown') {
+                downPressed = true;
+            } else if (event.key === ' ') {
+                spacePressed = true;
+            }
+        }
+
+        function keyUpHandler(event) {
+            if (event.key === 'Right' || event.key === 'ArrowRight') {
+                rightPressed = false;
+            } else if (event.key === 'Left' || event.key === 'ArrowLeft') {
+                leftPressed = false;
+            } else if (event.key === 'Up' || event.key === 'ArrowUp') {
+                upPressed = false;
+            } else if (event.key === 'Down' || event.key === 'ArrowDown') {
+                downPressed = false;
+            } else if (event.key === ' ') {
+                spacePressed = false;
+            }
+        }
+
+        function drawSpaceship() {
+            if (spaceshipExploded) {
+                ctx.drawImage(explosionImage, spaceshipX, spaceshipY, spaceshipWidth, spaceshipHeight);
+            } else {
+                ctx.drawImage(spaceship, spaceshipX, spaceshipY, spaceshipWidth, spaceshipHeight);
+            }
+        }
+
+        function drawBullets() {
+            ctx.fillStyle = 'blue';
+            for (let i = 0; i < bullets.length; i++) {
+                ctx.fillRect(bullets[i].x, bullets[i].y, 5, 5); // Adjust bullet size as needed
+            }
+        }
+
+        function drawAsteroid1s() {
+            for (let i = 0; i < asteroid1s.length; i++) {
+                const asteroid1Image = new Image();
+                asteroid1Image.src = asteroid1ImageSrc;
+                ctx.save();
+                ctx.translate(asteroid1s[i].x + 20, asteroid1s[i].y + 20); // Translate to the center of the asteroid1
+                ctx.rotate((asteroid1s[i].rotationAngle * Math.PI) / 180); // Rotate the asteroid1
+                // Adjust asteroid1 size as needed (e.g., set width and height)
+                ctx.drawImage(asteroid1Image, -20, -20, 40, 40); // Change the size here
+                ctx.restore();
+            }
+        }
+
+        function drawAsteroid2s() {
+            for (let i = 0; i < asteroid2s.length; i++) {
+                const asteroid2Image = new Image();
+                asteroid2Image.src = asteroid2ImageSrc;
+                ctx.save();
+                ctx.translate(asteroid2s[i].x + 20, asteroid2s[i].y + 20); // Translate to the center of the asteroid2
+                ctx.rotate((asteroid2s[i].rotationAngle * Math.PI) / 180); // Rotate the asteroid2
+                // Adjust asteroid2 size as needed (e.g., set width and height)
+                ctx.drawImage(asteroid2Image, -40, -40, 80, 80); // Change the size here
+                ctx.restore();
+            }
+        }
+
+        function drawEnemies() {
+            for (let i = 0; i < enemies.length; i++) {
+                const enemyImage = new Image();
+                enemyImage.src = enemyImageSrc;
+                // Adjust enemy size as needed (e.g., set width and height)
+                ctx.drawImage(enemyImage, enemies[i].x, enemies[i].y, 60, 60); // Change the size here
+            }
+        }
+
+        function drawExplosion(x, y) {
+            ctx.drawImage(explosionImage, x, y, 60, 60);
+            setTimeout(() => {
+                ctx.clearRect(x, y, 60, 60);
+            }, explosionTimeout);
+        }
+
+        function updateBullets() {
+            for (let i = 0; i < bullets.length; i++) {
+                bullets[i].y -= bulletSpeed;
+                if (bullets[i].y < 0) {
+                    bullets.splice(i, 1); // Remove bullets that go out of the canvas
+                }
+            }
+        }
+
+        function updateAsteroid1s() {
+            for (let i = 0; i < asteroid1s.length; i++) {
+                asteroid1s[i].y += asteroid1SpeedY;
+
+                // Add rotation angle to asteroid1s
+                // asteroid1s[i].rotationAngle += 0.3; // Increase the rotation angle (adjust the speed as needed)
+
+                // Check for collision with spaceship
+                if (
+                    !spaceshipExploded &&
+                    spaceshipX < asteroid1s[i].x + 40 &&
+                    spaceshipX + spaceshipWidth > asteroid1s[i].x &&
+                    spaceshipY < asteroid1s[i].y + 40 &&
+                    spaceshipY + spaceshipHeight > asteroid1s[i].y
+                ) {
+                    // Spaceship collision: Show explosion and set the flag
+                    spaceshipExploded = true;
+                    setTimeout(() => {
+                        spaceshipExploded = false;
+                    }, explosionTimeout); // Reset spaceship explosion after 1 second
+                }
+
+                // Check for collision with bullets
+                for (let j = 0; j < bullets.length; j++) {
+                    if (
+                        bullets[j].x < asteroid1s[i].x + 40 &&
+                        bullets[j].x + 5 > asteroid1s[i].x &&
+                        bullets[j].y < asteroid1s[i].y + 40 &&
+                        bullets[j].y + 5 > asteroid1s[i].y
+                    ) {
+                        // Bullet collision: Show explosion
+                        drawExplosion(asteroid1s[i].x, asteroid1s[i].y);
+                        setTimeout(() => {
+                            // Code to be executed after the specified delay
+                        }, explosionTimeout);
+
+                        asteroid1s.splice(i, 1);
+                        bullets.splice(j, 1);
+
+                        // Update the score
+                        score += 1;
+
+                        break; // Exit the inner loop
+                    }
+                }
+
+                if (asteroid1s[i]) {
+                    // Only draw the asteroid1 if it hasn't been removed
+                    const asteroid1Image = new Image();
+                    asteroid1Image.src = asteroid1ImageSrc;
+                    ctx.save();
+                    ctx.translate(asteroid1s[i].x + 20, asteroid1s[i].y + 20); // Translate to the center of the asteroid1
+                    ctx.rotate((asteroid1s[i].rotationAngle * Math.PI) / 180); // Rotate the asteroid1
+                    // Adjust asteroid1 size as needed (e.g., set width and height)
+                    ctx.drawImage(asteroid1Image, -20, -20, 40, 40); // Change the size here
+                    ctx.restore();
+                }
+            }
+        }
+
+        function updateAsteroid2s() {
+            for (let i = 0; i < asteroid2s.length; i++) {
+                asteroid2s[i].x += asteroid2SpeedX;
+                asteroid2s[i].y += asteroid2SpeedY;
+
+                // Add rotation angle to asteroid2s
+                asteroid2s[i].rotationAngle += 2; // Increase the rotation angle (adjust the speed as needed)
+
+                // Check for collision with spaceship
+                if (
+                    !spaceshipExploded &&
+                    spaceshipX < asteroid2s[i].x + 40 &&
+                    spaceshipX + spaceshipWidth > asteroid2s[i].x &&
+                    spaceshipY < asteroid2s[i].y + 40 &&
+                    spaceshipY + spaceshipHeight > asteroid2s[i].y
+                ) {
+                    // Spaceship collision: Show explosion and set the flag
+                    spaceshipExploded = true;
+                    setTimeout(() => {
+                        spaceshipExploded = false;
+                    }, explosionTimeout); // Reset spaceship explosion after 1 second
+                }
+
+                // Check for collision with bullets
+                for (let j = 0; j < bullets.length; j++) {
+                    if (
+                        bullets[j].x < asteroid2s[i].x + 40 &&
+                        bullets[j].x + 5 > asteroid2s[i].x &&
+                        bullets[j].y < asteroid2s[i].y + 40 &&
+                        bullets[j].y + 5 > asteroid2s[i].y
+                    ) {
+                        // Bullet collision: Show explosion
+                        drawExplosion(asteroid2s[i].x, asteroid2s[i].y);
+                        setTimeout(() => {
+                            // Code to be executed after the specified delay
+                        }, explosionTimeout);
+
+                        asteroid2s.splice(i, 1);
+                        bullets.splice(j, 1);
+
+                        // Update the score
+                        score += 3;
+
+                        break; // Exit the inner loop
+                    }
+                }
+
+                if (asteroid2s[i]) {
+                    // Only draw the asteroid2 if it hasn't been removed
+                    const asteroid2Image = new Image();
+                    asteroid2Image.src = asteroid2ImageSrc;
+                    ctx.save();
+                    ctx.translate(asteroid2s[i].x + 20, asteroid2s[i].y + 20); // Translate to the center of the asteroid2
+                    ctx.rotate((asteroid2s[i].rotationAngle * Math.PI) / 180); // Rotate the asteroid2
+                    // Adjust asteroid2 size as needed (e.g., set width and height)
+                    ctx.drawImage(asteroid2Image, -40, -40, 80, 80); // Change the size here
+                    ctx.restore();
+                }
+            }
+        }
+
+        function updateEnemies() {
+            for (let i = 0; i < enemies.length; i++) {
+                enemies[i].y += enemySpeedY;
+                if (enemies[i].y < (i%2+1) * 120) {
+                    enemies[i].x += enemySpeedX * (i%3);
+                } else if (enemies[i].y < (i%2+1) * 220) {
+                    enemies[i].x -= enemySpeedX * (i%3);
+                } else if (enemies[i].y < (i%2+1) * 320) {
+                    enemies[i].x += enemySpeedX * (i%3);
+                } else if (enemies[i].y < (i%2+1) * 420) {
+                    enemies[i].x -= enemySpeedX * (i%3);
+                } else {
+                    enemies[i].x += enemySpeedX * (i%3);
+                }
+
+                // Check for collision with spaceship
+                if (
+                    !spaceshipExploded &&
+                    spaceshipX < enemies[i].x + 60 &&
+                    spaceshipX + spaceshipWidth > enemies[i].x &&
+                    spaceshipY < enemies[i].y + 60 &&
+                    spaceshipY + spaceshipHeight > enemies[i].y
+                ) {
+                    // Spaceship collision: Show explosion and set the flag
+                    spaceshipExploded = true;
+                    setTimeout(() => {
+                        spaceshipExploded = false;
+                    }, explosionTimeout); // Reset spaceship explosion after 1 second
+                }
+
+                // Check for collision with bullets
+                for (let j = 0; j < bullets.length; j++) {
+                    if (
+                        bullets[j].x < enemies[i].x + 60 &&
+                        bullets[j].x + 5 > enemies[i].x &&
+                        bullets[j].y < enemies[i].y + 60 &&
+                        bullets[j].y + 5 > enemies[i].y
+                    ) {
+                        // Bullet collision: Show explosion
+                        drawExplosion(enemies[i].x, enemies[i].y);
+                        setTimeout(() => {
+                            // Code to be executed after the specified delay
+                        }, explosionTimeout);
+
+                        enemies.splice(i, 1);
+                        bullets.splice(j, 1);
+
+                        // Update the score
+                        score += 10;
+
+                        break; // Exit the inner loop
+                    }
+                }
+
+                if (enemies[i]) {
+                    // Only draw the enemy if it hasn't been removed
+                    const enemyImage = new Image();
+                    enemyImage.src = enemyImageSrc;
+                    // Adjust enemy size as needed (e.g., set width and height)
+                    ctx.drawImage(enemyImage, enemies[i].x, enemies[i].y, 60, 60); // Change the size here
+                }
+            }
+        }
+
+        function shootBullet() {
+            const bulletX = spaceshipX + spaceshipWidth / 2 - 2.5;
+            const bulletY = spaceshipY;
+            bullets.push({ x: bulletX, y: bulletY });
+        }
+
+        function createRandomAsteroid1() {
+            const asteroid1X = Math.random() * (canvas.width - 40);
+            const asteroid1Y = 0;
+            asteroid1s.push({ x: asteroid1X, y: asteroid1Y, rotationAngle: 0 });
+        }
+
+        function createRandomAsteroid2() {
+            const spawnFromTop = Math.random() < 0.5; // Randomly decide whether to spawn from the top or left
+            if (spawnFromTop) {
+                const asteroid2X = Math.random() * (canvas.width - 40);
+                const asteroid2Y = 0;
+                asteroid2s.push({ x: asteroid2X, y: asteroid2Y, rotationAngle: 0 }); // Initialize rotation angle
+            } else {
+                const asteroid2X = 0;
+                const asteroid2Y = Math.random() * (canvas.height - 40);
+                asteroid2s.push({ x: asteroid2X, y: asteroid2Y, rotationAngle: 0 }); // Initialize rotation angle
+            }
+        }
+
+        function createRandomEnemy() {
+            const enemyX = Math.random() * (canvas.width - 60);
+            const enemyY = 0;
+            enemies.push({ x: enemyX, y: enemyY });
+        }
+
+        function createEnemyBullet(enemyX, enemyY) {
+            const bulletX = enemyX + 30 - 2.5; // Adjust the position to align with the enemy
+            const bulletY = enemyY + 60; // Adjust the position to start from below the enemy
+            enemyBullets.push({ x: bulletX, y: bulletY });
+        }
+
+        function updateEnemyBullets() {
+            for (let i = 0; i < enemyBullets.length; i++) {
+                enemyBullets[i].y += enemyBulletSpeed;
+                if (enemyBullets[i].y > canvas.height) {
+                    enemyBullets.splice(i, 1); // Remove bullets that go out of the canvas
+                } else {
+                    // Check for collision with spaceship
+                    if (
+                        !spaceshipExploded &&
+                        spaceshipX < enemyBullets[i].x + 5 &&
+                        spaceshipX + spaceshipWidth > enemyBullets[i].x &&
+                        spaceshipY < enemyBullets[i].y + 5 &&
+                        spaceshipY + spaceshipHeight > enemyBullets[i].y
+                    ) {
+                        // Spaceship hit by enemy bullet: Show explosion and set the flag
+                        spaceshipExploded = true;
+                        setTimeout(() => {
+                            spaceshipExploded = false;
+                        }, explosionTimeout); // Reset spaceship explosion after 1 second
+                        enemyBullets.splice(i, 1); // Remove the enemy bullet
+                    }
+                }
+            }
+        }
+
+        function drawEnemyBullets() {
+            ctx.fillStyle = 'red';
+            for (let i = 0; i < enemyBullets.length; i++) {
+                ctx.fillRect(enemyBullets[i].x, enemyBullets[i].y, 5, 5); // Adjust bullet size as needed
+            }
+        }
+
+        // Function to check for collisions between spaceship bullets and enemy bullets
+        function checkBulletCollisionWithEnemyBullets() {
+            for (let i = 0; i < bullets.length; i++) {
+                for (let j = 0; j < enemyBullets.length; j++) {
+                    if (
+                        bullets[i].x < enemyBullets[j].x + 5 &&
+                        bullets[i].x + 5 > enemyBullets[j].x &&
+                        bullets[i].y < enemyBullets[j].y + 5 &&
+                        bullets[i].y + 5 > enemyBullets[j].y
+                    ) {
+                        // Bullet collision with enemy bullet: Remove both bullets
+                        bullets.splice(i, 1);
+                        enemyBullets.splice(j, 1);
+                        break; // Exit the inner loop
+                    }
+                }
+            }
+        }
+
+        // Function to update the game state
+        function updateGame() {
+            if (!gameOver) {
+                // Clear the canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                if (!spaceshipExploded) {
+                    // Update spaceship position based on user input
+                    if (rightPressed && spaceshipX < canvas.width - spaceshipWidth) {
+                        spaceshipX += spaceshipSpeed;
+                    }
+                    if (leftPressed && spaceshipX > 0) {
+                        spaceshipX -= spaceshipSpeed;
+                    }
+                    if (upPressed && spaceshipY > 0) {
+                        spaceshipY -= spaceshipSpeed;
+                    }
+                    if (downPressed && spaceshipY < canvas.height - spaceshipHeight) {
+                        spaceshipY += spaceshipSpeed;
+                    }
+
+                    // Check for shooting
+                    if (spacePressed) {
+                        shootBullet();
+                    }
+                }
+
+                // Draw the spaceship
+                drawSpaceship();
+
+                // Draw and update bullets
+                drawBullets();
+                updateBullets();
+
+                // Draw and update asteroid1s
+                drawAsteroid1s();
+                updateAsteroid1s();
+
+                // Draw and update asteroid2s
+                drawAsteroid2s();
+                updateAsteroid2s();
+
+                // Draw and update enemies
+                drawEnemies();
+                updateEnemies();
+
+                // Create random asteroid1s based on a threshold
+                if (Math.random() < CreationAsteroid1) {
+                    createRandomAsteroid1();
+                }
+
+                // Create random asteroid2s based on a threshold
+                if (Math.random() < CreationAsteroid2) {
+                    createRandomAsteroid2();
+                }
+
+                // Create random enemies based on a threshold
+                if (Math.random() < enemyCreationThreshold) {
+                    createRandomEnemy();
+                }
+                for (let i = 0; i < enemies.length; i++) {
+                    if (Math.random() < 0.02) {
+                        createEnemyBullet(enemies[i].x, enemies[i].y);
+                    }
+                }
+
+                // Draw and update enemy bullets
+                drawEnemyBullets();
+                updateEnemyBullets();
+
+                // Check for collisions between spaceship bullets and enemy bullets
+                checkBulletCollisionWithEnemyBullets();
+
+                // Display the score on the canvas
+                ctx.font = '30px Arial';
+                ctx.fillStyle = 'white';
+                ctx.fillText('Score: ' + score, 20, 40);
+
+                // Check for game over condition
+                if (spaceshipExploded) {
+                    explosionFrame += 1;
+                    if (explosionFrame >= maxExplosionFrames) {
+                        // Game over: Reset the game
+                        gameOver = true;
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; // Semi-transparent black background
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                        // Cool Game Over Text
+                        ctx.font = '60px Impact'; // Stylish font
+                        ctx.fillStyle = 'red';
+                        ctx.fillText('Game Over', canvas.width / 2 - 150, canvas.height / 2 - 50);
+
+                        // Explosion Animation in the Background
+                        // You can add your explosion animation here
+
+                        // Final Score
+                        ctx.font = '40px Arial'; // Font for the score
+                        ctx.fillStyle = 'white';
+                        ctx.fillText('Final Score:', canvas.width / 2 - 100, canvas.height / 2 + 40);
+
+                        // Display the Score with Animation
+                        let currentScore = 0;
+                        const scoreInterval = setInterval(() => {
+                            ctx.clearRect(canvas.width / 2 - 30, canvas.height / 2 + 60, 100, 40);
+                            ctx.fillText(currentScore, canvas.width / 2, canvas.height / 2 + 80);
+                            if (currentScore >= score) {
+                                clearInterval(scoreInterval); // Stop the animation when the score reaches the final score
+                            }
+                            currentScore++;
+                        }, 20);
+
+                        // Play Again Button
+                        ctx.fillStyle = 'green';
+                        ctx.fillRect(canvas.width / 2 - 100, canvas.height / 2 + 120, 200, 50);
+                        ctx.font = '30px Arial';
+                        ctx.fillStyle = 'white';
+                        ctx.fillText('Play Again', canvas.width / 2 - 70, canvas.height / 2 + 155);
+
+                        // Add Event Listener for Play Again Button
+                        canvas.addEventListener('click', (event) => {
+                            const rect = canvas.getBoundingClientRect();
+                            const mouseX = event.clientX - rect.left;
+                            const mouseY = event.clientY - rect.top;
+
+                            if (
+                                mouseX > canvas.width / 2 - 100 &&
+                                mouseX < canvas.width / 2 + 100 &&
+                                mouseY > canvas.height / 2 + 120 &&
+                                mouseY < canvas.height / 2 + 170
+                            ) {
+                                // Reload the page to restart the game
+                                location.reload();
+                            }
+                        });
+                    }
+                }
+
+                // Request the next frame
+                requestAnimationFrame(updateGame);
+            }
+        }
+
+        // Start the game
+        updateGame();
+    </script>
+</body>
+</html>
