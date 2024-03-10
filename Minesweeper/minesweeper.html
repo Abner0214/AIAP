@@ -1,0 +1,210 @@
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      #minesweeper {
+        display: grid;
+        grid-template-columns: repeat(16, 30px);
+        grid-gap: 1px;
+      }
+
+      .cell {
+        width: 30px;
+        height: 30px;
+        background-color: gray; /* Set the initial background color to dark gray */
+        border: 1px solid #333;
+        text-align: center;
+        vertical-align: middle;
+        line-height: 30px;
+        cursor: pointer;
+      }
+
+      .cell.mine {
+        background-color: gray;
+      }
+
+      .cell.clicked {
+        background-color: lightgray; /* Set the clicked background color to light gray */
+      }
+
+      .cell.adjacent-0 {
+        color: transparent;
+      }
+
+      .cell.adjacent-1 {
+        color: blue;
+      }
+
+      .cell.adjacent-2 {
+        color: green;
+      }
+
+      .cell.adjacent-3 {
+        color: red;
+      }
+
+      .cell.adjacent-4 {
+        color: purple;
+      }
+
+      .cell.adjacent-5 {
+        color: maroon;
+      }
+
+      .cell.adjacent-6 {
+        color: darkgreen;
+      }
+
+      .cell.adjacent-7 {
+        color: navy;
+      }
+
+      .cell.adjacent-8 {
+        color: black;
+      }
+
+      /* Additional CSS for right-clicked (flagged) cells */
+      .cell.flagged {
+        background-color: red; /* Set flagged background color to red */
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="minesweeper"></div>
+    <script>
+      const board = document.getElementById('minesweeper');
+
+      const rows = 16;
+      const cols = 16;
+      const numMines = 40;
+      let revealedSquares = 0;
+
+      function createBoard() {
+        for (let i = 0; i < rows; i++) {
+          for (let j = 0; j < cols; j++) {
+            const cell = document.createElement('div');
+            cell.classList.add('cell');
+            cell.dataset.row = i;
+            cell.dataset.col = j;
+            cell.addEventListener('contextmenu', toggleSquareColor);
+            cell.addEventListener('click', leftClickSquare);
+            board.appendChild(cell);
+          }
+        }
+      }
+
+      function toggleSquareColor(e) {
+        e.preventDefault(); // Prevent the default context menu
+        if (this.classList.contains('clicked')) return; // Ignore right-click on a revealed cell
+
+        if (!this.classList.contains('flagged')) {
+          this.classList.add('flagged'); // Right-clicking a dark gray square makes it red (flagged)
+        } else {
+          this.classList.remove('flagged'); // Right-clicking a flagged square makes it dark gray again
+        }
+      }
+
+      function leftClickSquare() {
+        if (this.classList.contains('clicked')) return; // Ignore already clicked cells
+
+        if (this.classList.contains('mine')) {
+          // Handle bomb hit (game over)
+          this.style.backgroundColor = 'gray';
+          alert('Game Over! You hit a bomb.');
+        } else {
+          this.classList.add('clicked');
+          this.style.backgroundColor = 'lightgray'; // Set the background color to light gray
+          revealedSquares++;
+
+          if (revealedSquares === rows * cols - numMines) {
+            // Check for a win
+            alert('Congratulations! You won!');
+          } else {
+            const row = parseInt(this.dataset.row);
+            const col = parseInt(this.dataset.col);
+            const num = getNumber(row, col);
+
+            if (num > 0) {
+              this.textContent = num; // Display the number within the cell
+              setNumberColor(this, num); // Set the number color
+            } else {
+              revealEmptySquares(row, col);
+            }
+          }
+        }
+      }
+
+      function placeMines() {
+        const mineLocations = new Set();
+
+        while (mineLocations.size < numMines) {
+          const randomRow = Math.floor(Math.random() * rows);
+          const randomCol = Math.floor(Math.random() * cols);
+          const location = `${randomRow}-${randomCol}`;
+
+          if (!mineLocations.has(location)) {
+            mineLocations.add(location);
+          }
+        }
+
+        for (const location of mineLocations) {
+          const [row, col] = location.split('-');
+          const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+          cell.classList.add('mine');
+        }
+      }
+
+      function getNumber(row, col) {
+        let num = 0;
+        for (let i = -1; i <= 1; i++) {
+          for (let j = -1; j <= 1; j++) {
+            const r = row + i;
+            const c = col + j;
+            if (r >= 0 && r < rows && c >= 0 && c < cols) {
+              const cell = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+              if (cell.classList.contains('mine')) {
+                num++;
+              }
+            }
+          }
+        }
+        return num;
+      }
+
+      function revealEmptySquares(row, col) {
+        for (let i = -1; i <= 1; i++) {
+          for (let j = -1; j <= 1; j++) {
+            const r = row + i;
+            const c = col + j;
+            if (r >= 0 && r < rows && c >= 0 && c < cols) {
+              const cell = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+              if (!cell.classList.contains('clicked')) {
+                cell.classList.add('clicked');
+                revealedSquares++;
+                const num = getNumber(r, c);
+                if (num === 0) {
+                  cell.style.backgroundColor = 'lightgray';
+                  revealEmptySquares(r, c);
+                } else if (num > 0) {
+                  cell.textContent = num; // Display the number within the cell
+                  setNumberColor(cell, num); // Set the number color
+                }
+              }
+            }
+          }
+        }
+      }
+
+      function setNumberColor(cell, num) {
+        // Define colors for each number
+        const numberColors = ['#000000', 'blue', 'green', 'red', 'purple', 'maroon', 'darkgreen', 'navy', 'black'];
+        cell.style.color = numberColors[num];
+      }
+
+      createBoard();
+      placeMines();
+    </script>
+  </body>
+</html>
